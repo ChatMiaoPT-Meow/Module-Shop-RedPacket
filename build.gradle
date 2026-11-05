@@ -1,36 +1,87 @@
 plugins {
-    id 'java-library'
-    id 'net.neoforged.moddev' version '2.0.144'
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '6.0.24'
 }
 
-version = mod_version
+version = "${mod_version}-forge-${minecraft_version}"
 group = 'cn.autoforged.module_shop_redpacket'
-base { archivesName = "module_shop_redpacket" }
+base { archivesName = mod_id }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-neoForge {
-    version = project.neo_version
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
     runs {
-        client { client() }
-        server { server(); programArgument '--nogui' }
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods { "${mod_id}" { source sourceSets.main } }
+        }
+        client {}
+        server { args '--nogui' }
     }
-    mods {
-        "${mod_id}" { sourceSet sourceSets.main }
+}
+
+repositories {
+    maven { name = 'MinecraftForge'; url = 'https://maven.minecraftforge.net/' }
+    // libs/：AtomLib（自动下载）与模块商店 jar（自己放入或用 -P 指定）
+    flatDir { dirs 'libs' }
+}
+
+// ===================== AtomLib（客户端 UI 前置） =====================
+// 与模块商店 1.20.1 分支同一个发布包：缺失时自动下载到 libs/，并校验 SHA-256（不提交进仓库）。
+import java.security.MessageDigest
+def atomlibName = "atomlib-1.20.1-forge-${atomlib_version}.jar"
+def atomlibFile = file("libs/${atomlibName}")
+def sha256Of = { File f ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    f.withInputStream { input ->
+        byte[] buffer = new byte[1 << 16]
+        int read
+        while ((read = input.read(buffer)) > 0) digest.update(buffer, 0, read)
+    }
+    digest.digest().encodeHex().toString()
+}
+if (!atomlibFile.isFile() || sha256Of(atomlibFile) != atomlib_jar_sha256) {
+    logger.lifecycle("[red-packet] 下载 AtomLib：${atomlib_jar_url}")
+    atomlibFile.parentFile.mkdirs()
+    def partial = new File(atomlibFile.parentFile, atomlibName + '.part')
+    new URL(atomlib_jar_url).withInputStream { input -> partial.withOutputStream { it << input } }
+    def actual = sha256Of(partial)
+    if (actual != atomlib_jar_sha256) {
+        partial.delete()
+        throw new GradleException("AtomLib 校验失败：期望 ${atomlib_jar_sha256}，实际 ${actual}")
+    }
+    atomlibFile.delete()
+    partial.renameTo(atomlibFile)
+}
+// Skija 与 humbleui types 在 AtomLib 的 Jar-in-Jar 里：解出来只给 javac 用。
+def skijaDir = layout.buildDirectory.dir('atomlib-compile')
+def extractAtomSkija = tasks.register('extractAtomSkija') {
+    inputs.file(atomlibFile)
+    def names = ['skija-shared-0.143.18.jar', 'types-0.2.0.jar']
+    outputs.files(names.collect { skijaDir.get().file(it) })
+    doLast {
+        new java.util.zip.ZipFile(atomlibFile).withCloseable { zip ->
+            names.each { name ->
+                def entry = zip.getEntry('META-INF/jarjar/' + name)
+                if (entry == null) throw new GradleException("AtomLib jar 缺少 META-INF/jarjar/${name}")
+                def dest = skijaDir.get().file(name).asFile
+                dest.parentFile.mkdirs()
+                zip.getInputStream(entry).withCloseable { input -> dest.withOutputStream { it << input } }
+            }
+        }
     }
 }
 
 // ===================== 模块商店依赖 =====================
-// 本仓库独立于模块商店主仓库。附属只对模块商店的**公共 API jar**（含 UI 套件）编译，按优先级找：
-//   1. -Pmodule_shop_api_jar=<文件>（以及运行用的 -Pmodule_shop_jar=<文件>）
-//   2. -Pmodule_shop_root=<模块商店主仓库目录>：用它构建出来的 build/libs/module_shop-<版本>[-api].jar
-//   3. 默认：本仓库 libs/ 目录下的 module_shop-<版本>-api.jar / module_shop-<版本>.jar
-// <版本> 取 gradle.properties 的 module_shop_version。AtomLib 见 gradle/atomlib.gradle（自动下载 + SHA-256 校验）。
-def shopVersion = project.module_shop_version.toString()
+// 附属只对模块商店（1.20.1 Forge 线）的**公共 API jar**（含 UI 套件）编译，按优先级找：
+//   1. -Pmodule_shop_api_jar=<文件>（以及开发运行用的 -Pmodule_shop_jar=<文件>）
+//   2. -Pmodule_shop_root=<模块商店 forge-1.20.1 分支目录>：用它构建出的 build/libs/module_shop-<版本>-forge-1.20.1[-api].jar
+//   3. 默认：本仓库 libs/ 下的 module_shop-<版本>-forge-1.20.1-api.jar / module_shop-<版本>-forge-1.20.1.jar
+def shopVersion = "${module_shop_version}-forge-${minecraft_version}"
 def pick = { String key, String fallback -> (project.findProperty(key) ?: fallback).toString() }
 def shopRootProp = project.findProperty('module_shop_root')
 def shopLibs = shopRootProp ? new File(file(shopRootProp.toString()), 'build/libs') : file('libs')
@@ -38,30 +89,42 @@ def shopApiJar = pick('module_shop_api_jar', new File(shopLibs, "module_shop-${s
 def shopJar = pick('module_shop_jar', new File(shopLibs, "module_shop-${shopVersion}.jar").path)
 
 tasks.named('compileJava').configure {
+    dependsOn extractAtomSkija
     def apiJar = shopApiJar
     doFirst {
         if (!new File(apiJar).isFile()) {
             throw new GradleException("找不到模块商店公共 API jar：${apiJar}\n" +
-                    "请把 module_shop-${shopVersion}-api.jar 放进 libs/，或用 -Pmodule_shop_root=<模块商店仓库目录> 指向已构建的主仓库。")
+                    "请把 module_shop-${shopVersion}-api.jar 放进 libs/，或用 -Pmodule_shop_root=<模块商店 forge-1.20.1 目录> 指向已构建的主仓库。")
         }
     }
 }
 
-// 开发运行（runClient / runServer）时把模块商店 jar 一起加载；不会写进发布产物的依赖。
-configurations {
-    localRuntime
-    runtimeClasspath.extendsFrom localRuntime
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    // 模块商店公共 API（官方映射名，开发环境用）：只编译期。
+    compileOnly files(shopApiJar)
+    // AtomLib 发布包里 Minecraft 引用是 SRG 名，开发环境要用 fg.deobf 映射回来。
+    compileOnly fg.deobf("local:atomlib-1.20.1-forge:${atomlib_version}")
+    compileOnly files(skijaDir.map { it.file('skija-shared-0.143.18.jar') }, skijaDir.map { it.file('types-0.2.0.jar') })
+    // 开发运行（runClient / runServer）时把模块商店与 AtomLib 一起加载；不进发布产物。
+    if (new File(shopJar).isFile()) {
+        runtimeOnly fg.deobf(files(shopJar))
+    }
+    runtimeOnly fg.deobf("local:atomlib-1.20.1-forge:${atomlib_version}")
 }
 
-// AtomLib（客户端 UI 前置）：与模块商店主仓库同一套脚本，compileOnly + 开发运行时加载。
-apply from: 'gradle/atomlib.gradle'
+tasks.named('processResources', ProcessResources).configure {
+    def props = [mod_version: mod_version, minecraft_version: minecraft_version]
+    inputs.properties props
+    filesMatching(['META-INF/mods.toml']) { expand props }
+}
 
-dependencies {
-    // 只对模块商店的公共 API 层编译：ModuleShopApi（经济 / 邮件）+ api.client（侧栏页面 + UI 套件）。
-    compileOnly files(shopApiJar)
-    if (new File(shopJar).isFile()) {
-        localRuntime files(shopJar)
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes(['Specification-Title': mod_id, 'Implementation-Title': project.name,
+                    'Implementation-Version': project.jar.archiveVersion])
     }
+    finalizedBy 'reobfJar'
 }
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }

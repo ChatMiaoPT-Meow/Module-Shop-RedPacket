@@ -1,14 +1,17 @@
-# module-shop: Red envelope · 拼手气红包
+# module-shop: Red envelope · 拼手气红包（Forge 1.20.1）
+
+> 本分支 `forge-1.20.1` 是 **Minecraft 1.20.1 / Forge** 版本；1.21.1 / NeoForge 版本在 [`main`](https://github.com/ChatMiaoPT-Meow/Module-Shop-RedPacket/tree/main) 分支。
+> 两个版本的玩法、界面、配置项与存档格式完全一致，只是加载器接线不同。
 
 **模块商店（Module Shop）的附属模组**：在商店里发拼手气 / 均分红包，红包出现在聊天栏，点击或发口令领取。
 
 | 项 | 值 |
 | --- | --- |
 | 显示名 | module-shop: Red envelope |
-| modid | `module_shop_redpacket`（NeoForge 的 modid 只能是小写字母、数字、下划线） |
+| modid | `module_shop_redpacket`（modid 只能是小写字母、数字、下划线） |
 | 版本 | 1.0.0 |
-| 游戏 / 加载器 | Minecraft 1.21.1 · NeoForge 21.1.x |
-| 前置 | **模块商店 1.0.3+**（两端）· **AtomLib 0.1.0-beta**（仅客户端，模块商店本来就需要） |
+| 游戏 / 加载器 | Minecraft 1.20.1 · Forge 47.x（47.4.9 实测） |
+| 前置 | **模块商店 1.0.3-beta+（Forge 1.20.1 线）**（两端）· **AtomLib 0.1.0-beta（1.20.1-forge）**（仅客户端，模块商店本来就需要） |
 | 许可 | MIT |
 | 主体仓库 | [ChatMiaoPT-Meow/Module-Shop](https://github.com/ChatMiaoPT-Meow/Module-Shop) |
 
@@ -19,8 +22,8 @@
 
 | 位置 | 放进 `mods/` 的文件 |
 | --- | --- |
-| 服务端 | `module_shop-1.0.3.jar` + `module_shop_redpacket-1.0.0.jar`（服务端**不需要** AtomLib） |
-| 客户端 | 上面两个 + `atomlib-1.21.1-neoforge-0.1.0-beta.jar` |
+| 服务端 | `module_shop-1.0.3-beta-forge-1.20.1.jar` + `module_shop_redpacket-1.0.0-forge-1.20.1.jar`（服务端**不需要** AtomLib） |
+| 客户端 | 上面两个 + `atomlib-1.20.1-forge-0.1.0-beta.jar` |
 
 两端都要装红包附属（界面在客户端，红包逻辑在服务端）。
 
@@ -53,7 +56,9 @@
 /redpacket send <个数> <总额> lucky|even [祝福语]
 ```
 
-## 配置（`config/module_shop_redpacket-server.toml`）
+## 配置（`<存档>/serverconfig/module_shop_redpacket-server.toml`）
+
+> Forge 1.20.1 的服务端配置按存档保存（首次进入存档时生成），想给所有新存档默认值可放进 `defaultconfigs/`。
 
 | 键 | 默认 | 说明 |
 | --- | --- | --- |
@@ -77,14 +82,14 @@
 
 | 库 | 版本 | 用途 | 依赖方式 | 许可 |
 | --- | --- | --- | --- | --- |
-| NeoForge | 21.1.248 | 模组加载、事件、网络包（`CustomPacketPayload`）、配置（`ModConfigSpec`） | 运行环境 | LGPL-2.1 |
-| Minecraft | 1.21.1 | 指令（Brigadier）、存档（`SavedData`）、聊天组件与点击事件 | 运行环境 | — |
-| **模块商店公共 API** | 1.1.0（模块商店 1.0.3） | 动钱：`economy().take / add / balance / balanceView`；满额转邮件：`mail().sendMoneyMail`；侧栏页面：`api.client.ShopModules / AddonPage / ShopTheme` | `compileOnly module_shop-<版本>-api.jar`（只含公共 API 与 UI 套件） | MIT |
+| Forge | 47.4.9 | 模组加载、事件（`MinecraftForge.EVENT_BUS`）、网络（`SimpleChannel`）、配置（`ForgeConfigSpec`） | 运行环境 | LGPL-2.1 |
+| Minecraft | 1.20.1 | 指令（Brigadier）、存档（`SavedData`）、聊天组件与点击事件 | 运行环境 | — |
+| **模块商店公共 API** | 1.1.0（模块商店 1.0.3-beta，Forge 1.20.1 线；与 1.21.1 线接口逐个一致） | 动钱：`economy().take / add / balance / balanceView`；满额转邮件：`mail().sendMoneyMail`；侧栏页面：`api.client.ShopModules / AddonPage / ShopTheme` | `compileOnly module_shop-<版本>-api.jar`（只含公共 API 与 UI 套件） | MIT |
 | **模块商店 UI 套件** | 随模块商店 | `Draw / Text / SkiaFrame / Button / SkiaTextField / Motion / ScrollController`：和内置页面同一套控件 | 同上（打包在 API jar 里） | MIT |
-| **AtomLib** | 0.1.0-beta（beta3） | 客户端 Skija 渲染桥、字体（Noto Sans SC）与文字排版 | `compileOnly`，运行时由客户端安装的 AtomLib 提供 | Apache-2.0 |
-| Skija | 0.143.18 | `Canvas` 绘制（运行时随 AtomLib 内置，只带 Windows 原生库） | 编译期作为 AtomLib 的传递依赖从 Maven Central 取 | Apache-2.0 |
-| ModDevGradle | 2.0.144 | 构建 | Gradle 插件 | LGPL-2.1 |
-| Parchment | 2024.11.17 | 参数名映射（只影响开发） | Gradle | CC0 |
+| **AtomLib** | 0.1.0-beta（beta3，`atomlib-1.20.1-forge`） | 客户端 Skija 渲染桥、字体（Noto Sans SC）与文字排版 | `compileOnly`，运行时由客户端安装的 AtomLib 提供 | Apache-2.0 |
+| Skija | 0.143.18 | `Canvas` 绘制（运行时随 AtomLib 内置，只带 Windows 原生库） | 编译期从 AtomLib 的 Jar-in-Jar 里解出（`skija-shared` + `types`） | Apache-2.0 |
+| ForgeGradle | 6.0.24 | 构建、`fg.deobf` 重映射 AtomLib、`reobfJar` | Gradle 插件 | LGPL-2.1 |
+| 官方映射（Mojang mappings） | 1.20.1 | 开发期名称 | Gradle | Mojang 映射许可 |
 
 红包本身没有打包任何第三方库，jar 里只有自己的类与语言文件。
 
@@ -108,21 +113,36 @@ src/main/resources/assets/module_shop_redpacket/lang/   zh_cn / en_us
 
 ## 构建
 
-本仓库可以单独构建，只需要模块商店的**公共 API jar**（`module_shop-1.0.3-api.jar`，含 UI 套件）。任选一种方式提供：
+需要 **JDK 17**（Forge 1.20.1 的要求）。本仓库可以单独构建，只需要模块商店 **Forge 1.20.1 线**的公共 API jar
+（`module_shop-1.0.3-beta-forge-1.20.1-api.jar`，含 UI 套件），任选一种方式提供：
 
-1. 把 `module_shop-1.0.3-api.jar` 放进本仓库的 `libs/`（想用 `runClient` 一起加载主体，就把 `module_shop-1.0.3.jar` 也放进去）；
-2. 或者指向本地已构建的模块商店主仓库：`./gradlew build -Pmodule_shop_root=../Module-Shop`。
+1. 放进本仓库的 `libs/`（想用 `runClient` / `runServer` 一起加载主体，就把 `module_shop-1.0.3-beta-forge-1.20.1.jar` 也放进去）；
+2. 或者指向本地已构建的模块商店 `forge-1.20.1` 分支：`./gradlew build -Pmodule_shop_root=../Module-Shop`。
 
 ```bash
-./gradlew build          # 产物：build/libs/module_shop_redpacket-1.0.0.jar
+./gradlew build          # 产物：build/libs/module_shop_redpacket-1.0.0-forge-1.20.1.jar（已 reobf，可直接放进 mods/）
 ```
 
 - 编译所用的主体版本由 `gradle.properties` 的 `module_shop_version` 决定；也可以用 `-Pmodule_shop_api_jar=<文件>` 直接指定。
-- AtomLib 由 `gradle/atomlib.gradle` 在第一次构建时自动下载 release 包并做 SHA-256 校验，解到 `.atomlib/maven`（与模块商店主仓库同一套脚本）；Skija 作为它的传递依赖从 Maven Central 取。
+- AtomLib（`atomlib-1.20.1-forge-0.1.0-beta.jar`）第一次构建时自动从 GitHub Release 下载到 `libs/` 并做 SHA-256 校验
+  （与模块商店 1.20.1 分支锁定同一个文件与校验值，不提交进仓库）；Skija 从它的 Jar-in-Jar 里解出来只给 javac 用。
+
+### 与 1.21.1 版的差异（只在接线层）
+
+| 方面 | 1.21.1 / NeoForge（`main`） | 1.20.1 / Forge（本分支） |
+| --- | --- | --- |
+| 入口 / 事件 | `@Mod` 构造参数 + `NeoForge.EVENT_BUS` | `FMLJavaModLoadingContext` + `MinecraftForge.EVENT_BUS`，`TickEvent.ServerTickEvent`（END 阶段） |
+| 网络 | `CustomPacketPayload` + `PayloadRegistrar` | `SimpleChannel`（协议版本 1），`DistExecutor` 隔离客户端处理 |
+| 配置 | `ModConfigSpec`，`config/` | `ForgeConfigSpec`，`<存档>/serverconfig/` |
+| 存档 | `SavedData.Factory` + `HolderLookup` | `computeIfAbsent(load, new, name)` |
+| 界面 | `renderBackground(g, x, y, pt)`、`mouseScrolled(x, y, sx, sy)` | `renderBackground(g)`、`mouseScrolled(x, y, delta)` |
+| 构建 | ModDevGradle，Java 21 | ForgeGradle 6，Java 17，`reobfJar` |
+
+页面、详情界面、红包逻辑与模块商店公共 API 的调用代码两个版本完全相同。
 
 ### 与主体版本的兼容
 
-- 依赖声明是 `module_shop [1.0.3,)`：之后的模块商店版本都能装；
+- 依赖声明是 `module_shop [1.0.3-beta,)`：之后的模块商店（Forge 1.20.1 线）版本都能装；
 - 只用公共 API 与 UI 套件，模块商店承诺这两部分在 1.x 内只增不改 → **已发布的红包 jar 在新版本主体上照样能用，不用跟着更新**；
 - 启动时检查公共 API 主版本是 1、次版本 ≥ 1（API 出现不兼容的 2.x 时会明确报错，而不是运行中出问题）；
 - 万一红包页面在某个新版本上出错，商店会停用这个页面并自动改用原版的发红包界面，商店和其它模块不受影响。
